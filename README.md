@@ -1,157 +1,97 @@
 # Gitar workshop
 
-This will walk you through setting up [Gitar](https://gitar.ai), opening a few different PR's, and watch an AI code reviewer find bugs, enforce your project's conventions, and fix a broken CI pipeline (all of which happens in the browser, no need to hop into any code editors).
+A hands-on workshop where you fork a small Flask order service, connect [Gitar](https://gitar.ai), and open pull requests that show how Gitar reviews code, enforces project conventions, diagnoses a CI failure, and fixes it.
 
-This guide works as a live reference during the workshop and as a standalone walkthrough afterward.
+Three pre-staged branches keep each application change small, so every diff is short and readable on screen. Everything happens in the browser.
 
-## Prerequisites
+## Part 1: Setup
 
-- A GitHub account that can create the workshop repository, open pull requests, and install a GitHub App
-- Admin access to at least one GitHub organization
+### Fork the repository
 
-No local tools or CLI are required for this, you can just install Gitar as a GitHub App.
+1. On the [sonar-samples/gitar-workshop](https://github.com/sonar-samples/gitar-workshop) page, click **Fork**.
+2. Leave **Copy the `main` branch only** unchecked so the workshop branches come along with their shared history.
+3. Create the fork.
 
-## Part 1: Install Gitar
+### Enable CI
 
-### Create your repo
+1. In your fork, go to **Actions** and enable workflows if prompted.
+2. Open the **Test** workflow and click **Run workflow** on the `main` branch. Wait for it to pass. This registers the `test` check so branch protection can require it later.
 
-1. Go to the template repository (your presenter will share the link).
-2. Click **Use this template** > **Create a new repository**.
-3. Check **Include all branches** before you create the repo. The workshop uses three branches that contain pre-staged code changes, so if you ship this checkbox then the branches won't be there when you need them.
-4. Set the owner to your personal account and give the repo any name you like.
-5. Click **Create repository**.
+### Connect Gitar
 
-### Install the Gitar GitHub App
+1. In Gitar, open **Settings > Configuration** and connect your GitHub account if it is not already connected.
+2. Grant Gitar access to your fork.
+3. Return to **Settings > Configuration** and confirm that the fork is connected.
 
-1. Go to [gitar.ai](https://gitar.ai) and click **Install Now**.
-2. Select **Only select repositories** and choose the repository you just created.
-3. Complete the installation.
+### Configure merge controls
 
-### Verify
+1. In your fork's **Settings > General**, scroll to **Pull Requests** and enable **Allow auto-merge**.
+2. Under **Settings > Rules > Rulesets**, create an active branch ruleset that targets `main`, requires pull requests, requires one approval, and requires the `test` status check to pass before merging.
 
-Go to your repository's **Settings** > **GitHub Apps** (under Integrations). You should see Gitar listed, so if it appears, you're ready for Part 2.
+### Confirm Gitar settings
 
-If Gitar does not appear after a minute, refresh the settings page. Sometimes GitHub takes a moment to reflect newly installed apps. If it still doesn't appear, try the install again from [gitar.ai](https://gitar.ai), because a common cause is selecting the wrong repository or the wrong GitHub account during installation.
+In Gitar, confirm that auto-approve is enabled for your repository. Auto-apply and auto-merge should both be off because Part 4 enables them for a single PR.
 
-## Part 2: Gitar finds and fixes a business logic bug
+## Part 2: Business logic review
 
-### Open the pull request
+Open a pull request with **base** `main` and **compare** `part-2-price-override`.
 
-1. In your repository, go to **Pull Requests** > **New pull request**.
-2. Set **base** to `main` and **compare** to `part-2-price-override`.
-3. Click **Create pull request**. You can leave the title and description as they are.
+Before creating it, read the diff. The change lets API clients submit their own `unit_price_cents` while a comment at the top of `app.py` says catalog prices are authoritative.
 
-### Wait for the review
+Create the pull request and wait for Gitar's review.
 
-Gitar reviews the pull request automatically. In previous runs of this step, the review appeared in about ~30 seconds, and the dashboard comment appears a little after that.
+When the review appears, read the findings and the proposed fix. Then comment:
 
-You should see a review comment from Gitar with a **Security** finding tagged with a red alert icon. The finding explains that the code change lets API clients set their own price for products, which means anyone could buy a $25 item for a penny. Gitar caught this because the code contradicts a comment in the source that says catalog prices are authoritative, and an endpoint that accepts client-supplied prices violates that invariant.
-
-The PR also shows a blocking review status, which means Gitar would prevent this from merging in its current state.
-
-If no review appears after a few minutes, confirm that you installed Gitar for the repository you created, then check the Gitar dashboard for the review status.
-
-### Ask Gitar to fix it
-
-Comment on the pull request:
-
-```
+```text
 gitar fix this
 ```
 
-The fix should remove the client-supplied price path entirely and always uses the server-side catalog price, which is the correct behavior. After the fix, Gitar updates its review to **Approved** and the CI checks pass.
+After the fix commit lands, inspect the diff to confirm the catalog is still treated as authoritative, then check that the review status is Approved and CI is green. Leave this PR open.
 
-Scroll through the review to see the before-and-after. The finding moves from unresolved to resolved, and the blocking status clears.
+## Part 3: Repository-specific context
 
-### Recap
+Open a pull request with **base** `main` and **compare** `part-3-context-ingestion`.
 
-You opened a pull request with a one-line code change that was intended to look fine (the PR title even says "Support cached unit prices from mobile clients"), and Gitar identified it as a security problem by reasoning about what the code should do based on the repository's own context. Then Gitar was askjed to fix it, and it pushed a commit that resolved the issue.
+This branch adds two configuration files alongside a code change:
 
-## Part 3: Gitar enforces project conventions
+- `.gitar/review/instructions.md` defines a naming convention for order references (the `ORDER-000001` format).
+- `.gitar/rules/order-api-change-check.md` requests API documentation updates whenever `app.py` changes.
 
-### Open the pull request
+The code change adds a `reference` field that violates the instruction's naming convention.
 
-1. **Pull Requests** > **New pull request**.
-2. Set **base** to `main` and **compare** to `part-3-context-ingestion`.
-3. Click **Create pull request**.
+When the review lands, look for the convention-based finding, the separate rule action, and the `documentation` label. Do not request a fix for this PR.
 
-### Wait for the review
+## Part 4: CI failure and automated remediation
 
-This PR includes three changes: a new line of application code, a review instruction file in `.gitar/review/instructions.md`, and a repository rule in `.gitar/rules/order-api-change-check.md`. Gitar reads the instruction and rule files from the PR's branch, so they take effect on this review even though they don't exist on `main` yet.
+Open a pull request with **base** `main` and **compare** `part-4-ci-failure`.
 
-Roughly the following should appear (below output is from previous runs, but exact findings can vary slightly):
+The branch changes the response for unknown products from HTTP 404 to HTTP 200, which breaks a test that asserts the original status code. Wait for CI to fail.
 
-**A blocking code review finding.** The finding is tagged as a **Quality** issue and says the order reference does not follow the `ORDER-000001` format. The code uses `order-1` (lowercase, unpadded), while the project convention defined in the instruction file requires an uppercase `ORDER-` prefix with the numeric ID zero-padded to six digits. Gitar cites the project convention by name in the finding, because this isn't a generic best-practice suggestion but an enforcement of a rule that exists only in your repository's configuration.
+Gitar posts a diagnosis of the failure on the PR. Read it before doing anything else because it may not remain visible after remediation.
 
-**A separate rule action comment.** Below the code review, Gitar posts a comment requesting API documentation updates because the rule detected a new field in the public order response. The review summary also shows a "Rules" section with "1 action taken" and a guitar emoji, which is how Gitar distinguishes rule actions from code review findings.
+Post one comment with both controls:
 
-If the review does not appear after a few minutes, confirm that Gitar can access the repository, then check the Gitar dashboard for the review status.
-
-### Building on concepts
-
-In Part 2, Gitar caught a bug using its general understanding of the code. Here, it's enforcing a convention specific to this project, one it could only know about because of the instruction file you added to the repository. The rule action works differently so instead of analyzing code quality, it watches for specific PR events (in this case, changes to `app.py`) and runs an automated workflow.
-
-Review instructions and repository rules are what make Gitar's reviews project-aware rather than generic.
-
-## Part 4: Gitar fixes a failing CI pipeline
-
-### Open the pull request
-
-1. **Pull Requests** > **New pull request**.
-2. Set **base** to `main` and **compare** to `part-3-ci-failure`.
-3. Click **Create pull request**.
-
-### Watch CI fail
-
-GitHub Actions runs the test suite automatically when you open the PR. One test fails because the code change altered the response status for unknown products, and the test still expects the original behavior.
-
-Gitar detects the CI failure automatically and posts an analysis comment that identifies the failing test, explains the root cause (the test expects a 404 but the code now returns a 200), and recommends a fix. Gitar also posts a code review with its own findings about the change. All of this happens without any action from you.
-
-### Ask Gitar to fix it
-
-Comment on the pull request:
-
-```
-gitar fix CI
+```text
+gitar auto-apply:on
+gitar auto-merge:on
 ```
 
-Gitar pushes a fix commit that restores the correct behavior (returning a 404 for unknown products). GitHub Actions reruns automatically after the push. Once CI is green, Gitar updates its review to **Approved**.
+Gitar commits a fix to the branch. GitHub reruns CI against the new commit and waits for the required check and approval before merging.
 
-If CI doesn't rerun after Gitar's fix commit, push an empty commit to trigger it:
-
-```bash
-git commit --allow-empty -m "trigger CI" && git push
-```
-
-Or, since everything in this workshop happens in the browser, you can edit any file on the branch through GitHub's web editor (add a blank line to the README, for example) and commit the change to trigger CI.
-
-### The fix
-
-Gitar read the CI logs, identified which test was broken and why, and waited for you to decide what to do about it. When you said `gitar fix CI`, it pushed a commit that fixed the underlying code problem (not the test assertion), because the original 404 behavior was correct and the PR's change was the bug. CI reran and went green without any manual intervention beyond the fix command.
-
-## Take-home
-
-The workshop covered code review with fix suggestions, project-specific review instructions and rules, and CI failure diagnosis with automated fixes.
-
-The easiest next step is to try Gitar on one of your own repositories. Install it from [gitar.ai](https://gitar.ai), select a repository, and open a pull request. Gitar reviews it automatically with no configuration required. The 14-day trial includes Pro features, so you can try review instructions and rules on your own codebase.
-
-From there, create a `.gitar/review/instructions.md` file that describes your project's conventions, coding standards, or architectural rules. Gitar reads these on every review and enforces them alongside its standard analysis. If you manage multiple repositories, Gitar also supports organization-wide custom instructions through the [Gitar dashboard](https://docs.gitar.ai/configuration/settings), and individual repositories can layer additional conventions on top.
-
-Gitar integrates with [Jira](https://docs.gitar.ai/integrations/jira), [Linear](https://docs.gitar.ai/integrations/linear), and [Slack](https://docs.gitar.ai/integrations/slack) so that review context includes linked ticket details and notifications go where your team already works.
+Verify the fix by reading the commit diff and confirming that CI passes.
 
 ## Troubleshooting
 
-**Gitar doesn't appear in Settings > GitHub Apps.** Refresh the page and wait a minute. If it still doesn't show, go back to [gitar.ai](https://gitar.ai) and click Install Now again. The most common causes are selecting the wrong repository during installation, choosing an organization account instead of your personal account, or the browser caching a stale settings page.
+**No review appears.** Confirm the repository is connected in Gitar and that you have a Gitar seat. You can comment `gitar review` to request a re-review.
 
-**No review appears after opening a pull request.** Gitar automatically processes activity on new pull requests in connected repositories. For an existing pull request, use the **Try Gitar on Open PRs** card in the Gitar dashboard.
+**No workflow run.** Make sure you enabled Actions and ran the Test workflow manually during setup.
 
-**CI doesn't rerun after Gitar pushes a fix.** GitHub Actions triggers on pushes to the PR branch, so it should rerun automatically. If it doesn't, the workflow may need manual enablement on template-created repositories. Go to the **Actions** tab in your repository and click the green button to enable workflows if you see a prompt. Alternatively, push an empty commit to the branch, or edit any file through GitHub's web editor and commit the change.
+**Part 4 merges before you read the diagnosis.** Auto-apply or auto-merge was enabled before the exercise. Both should be off until you post the comment.
 
 ## Resources
 
-- [Gitar](https://gitar.ai)
 - [Gitar documentation](https://docs.gitar.ai)
-- [Gitar commands reference](https://docs.gitar.ai/commands)
-- [Repository configuration](https://docs.gitar.ai/configuration/repository-config)
-- [Repository rules](https://docs.gitar.ai/features/rules)
+- [Commands reference](https://docs.gitar.ai/commands)
 - [CI failure analysis](https://docs.gitar.ai/features/ci-failure-analysis)
+- [Repository rules](https://docs.gitar.ai/features/rules)
+- [Auto-merge](https://docs.gitar.ai/features/code-review/auto-merge)

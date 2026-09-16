@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-# Catalog prices are authoritative — clients submit SKU and quantity only.
+# Catalog prices are authoritative. Clients submit SKU and quantity only.
 CATALOG = {
     "WIDGET-A": 2500,
     "GADGET-B": 1800,
@@ -31,7 +31,7 @@ def create_order():
         if sku not in CATALOG:
             return jsonify({"error": "Product not found"}), 404
 
-        unit_price = CATALOG[item["sku"]]
+        unit_price = CATALOG[sku]
         quantity = item["quantity"]
         line_items.append(
             {
