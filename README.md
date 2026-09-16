@@ -46,7 +46,7 @@ When the review appears, read the findings and the proposed fix. Then comment:
 gitar fix this
 ```
 
-After the fix commit lands, inspect the diff to confirm the catalog is still treated as authoritative, then check that the review status is Approved and CI is green. Leave this PR open.
+After the fix commit lands, inspect the diff to confirm the catalog is still treated as authoritative, then check that CI is green. Gitar may leave a separate finding, such as missing test coverage, for you to consider. Leave this PR open.
 
 ## Part 3: Repository-specific context
 
